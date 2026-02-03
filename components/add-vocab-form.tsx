@@ -8,25 +8,20 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowUp, Upload, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
-import { addVocab, addBulkVocab } from "@/app/actions"
-
-interface AddVocabFormProps {
-  onSuccess: () => void
-}
-
-type NotificationType = "success" | "error" | "warning" | null
-
-interface Notification {
-  type: NotificationType
-  title: string
-  message: string
-}
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { JLPTLevel } from "@/lib/types"
 
 export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
   const [isPending, startTransition] = useTransition()
-  
+
   const [word, setWord] = useState("")
+  const [level, setLevel] = useState<JLPTLevel | undefined>(undefined)
   const [bulkText, setBulkText] = useState("")
   const [notification, setNotification] = useState<Notification | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -58,13 +53,13 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
     setNotification(null)
 
     startTransition(async () => {
-      const result = await addVocab({ word: trimmedWord })
-      
+      const result = await addVocab({ word: trimmedWord, level })
+
       if (result.success) {
         setNotification({
           type: "success",
           title: "Added Successfully",
-          message: `"${trimmedWord}" has been added to your vocabulary list.`
+          message: `"${trimmedWord}" has been added to your vocabulary list${level ? ` (${level})` : ''}.`
         })
         onSuccess()
       } else if (result.existing) {
@@ -97,15 +92,15 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
     setNotification(null)
 
     startTransition(async () => {
-      const result = await addBulkVocab(bulkText)
-      
+      const result = await addBulkVocab(bulkText, level)
+
       if (result.success > 0) {
         const parts: string[] = []
         parts.push(`${result.success} word${result.success > 1 ? 's' : ''} added`)
         if (result.skipped > 0) {
           parts.push(`${result.skipped} duplicate${result.skipped > 1 ? 's' : ''} skipped`)
         }
-        
+
         setNotification({
           type: "success",
           title: "Import Complete",
@@ -159,9 +154,9 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
           <p className={`font-medium text-sm ${style.text}`}>{notification.title}</p>
           <p className={`text-sm ${style.text} opacity-80 mt-0.5`}>{notification.message}</p>
         </div>
-        <button 
+        <button
           type="button"
-          onClick={() => setNotification(null)} 
+          onClick={() => setNotification(null)}
           className={`${style.text} opacity-60 hover:opacity-100 transition-opacity p-1`}
         >
           <XCircle className="w-4 h-4" />
@@ -170,13 +165,37 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
     )
   }
 
+  const LevelSelector = () => (
+    <Select value={level || "no-level"} onValueChange={(val) => setLevel(val === "no-level" ? undefined : val as JLPTLevel)}>
+      <SelectTrigger className="w-[140px] bg-white border-neutral-200">
+        <SelectValue placeholder="JLPT Level" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="no-level">No Level</SelectItem>
+        <SelectItem value="N5">N5 (Easy)</SelectItem>
+        <SelectItem value="N4">N4</SelectItem>
+        <SelectItem value="N3">N3</SelectItem>
+        <SelectItem value="N2">N2</SelectItem>
+        <SelectItem value="N1">N1 (Hard)</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+
   return (
     <Card className="shadow-sm border-neutral-200">
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg sm:text-xl text-neutral-900">Add Vocabulary</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg sm:text-xl text-neutral-900">Add Vocabulary</CardTitle>
+          <div className="hidden sm:block">
+            <LevelSelector />
+          </div>
+        </div>
         <CardDescription className="text-sm text-neutral-500">
           Type a Japanese word or bulk import multiple words
         </CardDescription>
+        <div className="sm:hidden mt-2">
+          <LevelSelector />
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="single" className="w-full">
@@ -184,7 +203,7 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
             <TabsTrigger value="single" className="text-sm data-[state=active]:bg-white data-[state=active]:text-neutral-900">Single Word</TabsTrigger>
             <TabsTrigger value="bulk" className="text-sm data-[state=active]:bg-white data-[state=active]:text-neutral-900">Bulk Import</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="single" className="space-y-3">
             <NotificationBanner />
             <form onSubmit={handleSingleSubmit}>
@@ -198,10 +217,10 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
                   rows={1}
                   className="flex-1 resize-none bg-transparent border-0 focus:outline-none focus:ring-0 text-lg px-3 py-2 min-h-[44px] max-h-[120px] text-neutral-900 placeholder:text-neutral-400"
                 />
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   size="icon"
-                  disabled={isPending || !word.trim()} 
+                  disabled={isPending || !word.trim()}
                   className="shrink-0 h-10 w-10 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white disabled:bg-neutral-300 disabled:text-neutral-500 transition-colors"
                 >
                   {isPending ? (
@@ -216,7 +235,7 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
               </p>
             </form>
           </TabsContent>
-          
+
           <TabsContent value="bulk" className="space-y-3">
             <NotificationBanner />
             <form onSubmit={handleBulkSubmit} className="space-y-4">
@@ -235,10 +254,10 @@ export function AddVocabForm({ onSuccess }: AddVocabFormProps) {
                   Only Japanese characters accepted. Duplicates will be skipped automatically.
                 </p>
               </div>
-              
-              <Button 
-                type="submit" 
-                disabled={isPending} 
+
+              <Button
+                type="submit"
+                disabled={isPending}
                 className="w-full sm:w-auto bg-neutral-900 hover:bg-neutral-800 text-white"
               >
                 {isPending ? (
