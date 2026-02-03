@@ -1,6 +1,7 @@
 "use client"
 
 import { BookOpen } from "lucide-react"
+import { VocabExport } from "@/components/vocab-export"
 
 interface HeaderProps {
   vocabCount: number
@@ -24,13 +25,16 @@ export function Header({ vocabCount }: HeaderProps) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-neutral-100 rounded-xl px-4 py-2.5 self-start sm:self-auto">
-            <span className="text-2xl sm:text-3xl font-bold text-neutral-900 tabular-nums">
-              {vocabCount.toLocaleString()}
-            </span>
-            <span className="text-xs sm:text-sm text-neutral-500">
-              words
-            </span>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+            <VocabExport />
+            <div className="flex items-center gap-2 bg-neutral-100 rounded-xl px-4 py-2.5">
+              <span className="text-2xl sm:text-3xl font-bold text-neutral-900 tabular-nums">
+                {vocabCount.toLocaleString()}
+              </span>
+              <span className="text-xs sm:text-sm text-neutral-500">
+                words
+              </span>
+            </div>
           </div>
         </div>
       </div>
