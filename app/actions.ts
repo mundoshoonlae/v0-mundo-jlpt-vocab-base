@@ -31,6 +31,29 @@ export async function getVocabList(): Promise<Vocab[]> {
   return data || []
 }
 
+export async function getAllVocab(): Promise<string[]> {
+  const supabase = await createClient()
+
+  // csv() returns the raw CSV string, which is efficient,
+  // but if we want just the words as an array to process in client (or csv here),
+  // we can select just the 'word' column.
+  // Supabase limits to 1000 by default. Set a high range to get everything.
+  // Although .csv() might be better, let's stick to JSON array of strings for flexibility in the client.
+  const { data, error } = await supabase
+    .from("vocabulary")
+    .select("word")
+    .order("created_at", { ascending: false })
+    .range(0, 99999)
+
+  if (error) {
+    console.error("Error fetching all vocab:", error)
+    return []
+  }
+
+  // @ts-ignore - supabase types might infer array of objects, map safely
+  return data?.map((item: any) => item.word) || []
+}
+
 export async function getVocabCount(): Promise<number> {
   const supabase = await createClient()
 
