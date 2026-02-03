@@ -15,43 +15,59 @@ function cleanWord(word: string): string {
   return word.trim()
 }
 
-export async function getVocabList(): Promise<Vocab[]> {
-  const supabase = await createClient()
+// Helper to fetch all rows recursively
+async function fetchAllRows<T>(
+  supabase: any,
+  table: string,
+  select: string,
+  orderBy: string = "created_at",
+  ascending: boolean = false
+): Promise<T[]> {
+  let allData: T[] = []
+  let page = 0
+  const pageSize = 1000
 
-  const { data, error } = await supabase
-    .from("vocabulary")
-    .select("id, word, created_at")
-    .order("created_at", { ascending: false })
+  while (true) {
+    const from = page * pageSize
+    const to = from + pageSize - 1
 
-  if (error) {
-    console.error("Error fetching vocab:", error)
-    return []
+    const { data, error } = await supabase
+      .from(table)
+      .select(select)
+      .order(orderBy, { ascending })
+      .range(from, to)
+
+    if (error) {
+      console.error(`Error fetching page ${page} of ${table}:`, error)
+      break
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allData = allData.concat(data as T[])
+
+    if (data.length < pageSize) {
+      break
+    }
+
+    page++
   }
 
-  return data || []
+  return allData
+}
+
+export async function getVocabList(): Promise<Vocab[]> {
+  const supabase = await createClient()
+  return fetchAllRows<Vocab>(supabase, "vocabulary", "id, word, created_at")
 }
 
 export async function getAllVocab(): Promise<string[]> {
   const supabase = await createClient()
-
-  // csv() returns the raw CSV string, which is efficient,
-  // but if we want just the words as an array to process in client (or csv here),
-  // we can select just the 'word' column.
-  // Supabase limits to 1000 by default. Set a high range to get everything.
-  // Although .csv() might be better, let's stick to JSON array of strings for flexibility in the client.
-  const { data, error } = await supabase
-    .from("vocabulary")
-    .select("word")
-    .order("created_at", { ascending: false })
-    .range(0, 99999)
-
-  if (error) {
-    console.error("Error fetching all vocab:", error)
-    return []
-  }
-
-  // @ts-ignore - supabase types might infer array of objects, map safely
-  return data?.map((item: any) => item.word) || []
+  // Fetch just the word column
+  const data = await fetchAllRows<{ word: string }>(supabase, "vocabulary", "word")
+  return data.map(item => item.word)
 }
 
 export async function getVocabCount(): Promise<number> {
