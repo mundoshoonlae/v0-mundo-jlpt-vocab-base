@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Download, FileDown, Loader2 } from "lucide-react"
-import { getVocabList } from "@/app/actions"
+import { getVocabList, getAllVocab } from "@/app/actions"
 import type { Vocab } from "@/lib/types"
 
 export function VocabExport() {
@@ -11,10 +11,8 @@ export function VocabExport() {
 
     const handleExport = (type: "csv" | "md") => {
         startTransition(async () => {
-            // Fetch all vocab
-            // Note: In a real large app we might want a specific 'export' server action that streams,
-            // but for ~7k items, fetching the JSON array is fine.
-            const vocabList = await getVocabList()
+            // Fetch all vocab (words only) using the new unlimited action
+            const vocabList = await getAllVocab()
 
             if (!vocabList || vocabList.length === 0) {
                 alert("No vocabulary to export")
@@ -26,13 +24,13 @@ export function VocabExport() {
             let mimeType = ""
 
             if (type === "csv") {
-                // CSV Header
-                content = "word,created_at\n"
+                // CSV Header - user requested "vocab only", so maybe just the word column?
+                // Or "word" as header. Let's do a simple header.
+                content = "word\n"
                 // CSV Body
-                content += vocabList.map(v => {
-                    // Escape quotes if needed, though simple Japanese words usually don't have them
-                    const escapedWord = v.word.includes('"') ? `"${v.word.replace(/"/g, '""')}"` : v.word
-                    return `${escapedWord},${v.created_at}`
+                content += vocabList.map(word => {
+                    // Escape quotes if needed
+                    return word.includes('"') ? `"${word.replace(/"/g, '""')}"` : word
                 }).join("\n")
 
                 filename += ".csv"
@@ -42,11 +40,10 @@ export function VocabExport() {
                 content = "# Mundo JLPT Vocabulary Export\n\n"
                 content += `Exported on: ${new Date().toLocaleDateString()}\n`
                 content += `Total words: ${vocabList.length}\n\n`
-                content += "| Word | Added Date |\n"
-                content += "|---|---|\n"
-                content += vocabList.map(v => {
-                    return `| ${v.word} | ${new Date(v.created_at).toLocaleDateString()} |`
-                }).join("\n")
+                // Simple list or table? "vocab and vocab only" implies minimal metadata.
+                // A simple list might be cleaner, but a table is standard.
+                // Let's do a simple list as requested.
+                content += vocabList.map(word => `- ${word}`).join("\n")
 
                 filename += ".md"
                 mimeType = "text/markdown;charset=utf-8;"
