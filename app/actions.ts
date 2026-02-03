@@ -60,12 +60,11 @@ async function fetchAllRows<T>(
 
 export async function getVocabList(): Promise<Vocab[]> {
   const supabase = await createClient()
-  return fetchAllRows<Vocab>(supabase, "vocabulary", "id, word, created_at")
+  return fetchAllRows<Vocab>(supabase, "vocabulary", "id, word, level, created_at")
 }
 
 export async function getAllVocab(): Promise<string[]> {
   const supabase = await createClient()
-  // Fetch just the word column
   const data = await fetchAllRows<{ word: string }>(supabase, "vocabulary", "word")
   return data.map(item => item.word)
 }
@@ -90,7 +89,7 @@ export async function checkWordExists(word: string): Promise<Vocab | null> {
 
   const { data, error } = await supabase
     .from("vocabulary")
-    .select("id, word, created_at")
+    .select("id, word, level, created_at")
     .eq("word", cleanWord(word))
     .maybeSingle()
 
@@ -104,6 +103,7 @@ export async function checkWordExists(word: string): Promise<Vocab | null> {
 
 export async function addVocab(input: VocabInput): Promise<{ success: boolean; message: string; existing?: Vocab }> {
   const word = cleanWord(input.word)
+  const level = input.level
 
   if (!word) {
     return { success: false, message: "Word cannot be empty" }
@@ -122,7 +122,7 @@ export async function addVocab(input: VocabInput): Promise<{ success: boolean; m
 
   const { error } = await supabase
     .from("vocabulary")
-    .insert({ word })
+    .insert({ word, level })
 
   if (error) {
     console.error("Error adding vocab:", error)
@@ -133,7 +133,7 @@ export async function addVocab(input: VocabInput): Promise<{ success: boolean; m
   return { success: true, message: `Added "${word}" successfully` }
 }
 
-export async function addBulkVocab(text: string): Promise<{ success: number; skipped: number; errors: string[] }> {
+export async function addBulkVocab(text: string, level?: string): Promise<{ success: number; skipped: number; errors: string[] }> {
   // 1. Pre-process all inputs: clean, validate, and deduplicate
   const rawLines = text.split("\n").map(line => cleanWord(line)).filter(line => line.length > 0)
 
@@ -189,7 +189,7 @@ export async function addBulkVocab(text: string): Promise<{ success: number; ski
     // Step C: Bulk Insert new words
     const { error: insertError } = await supabase
       .from("vocabulary")
-      .insert(newWords.map(word => ({ word })))
+      .insert(newWords.map(word => ({ word, level })))
 
     if (insertError) {
       console.error("Error inserting batch:", insertError)
@@ -209,6 +209,7 @@ export async function updateVocab(
   input: VocabInput
 ): Promise<{ success: boolean; message: string }> {
   const word = cleanWord(input.word)
+  const level = input.level
 
   if (!word) {
     return { success: false, message: "Word cannot be empty" }
@@ -234,7 +235,7 @@ export async function updateVocab(
 
   const { error } = await supabase
     .from("vocabulary")
-    .update({ word })
+    .update({ word, level })
     .eq("id", id)
 
   if (error) {
@@ -261,4 +262,27 @@ export async function deleteVocab(id: string): Promise<{ success: boolean; messa
 
   revalidatePath("/")
   return { success: true, message: "Deleted successfully" }
+}
+
+export async function deleteAllVocab(): Promise<{ success: boolean; message: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from("vocabulary")
+    .delete()
+    .neq("id", "00000000-0000-0000-0000-000000000000") // Hack to delete all, or use a filter that matches everything. Or just delete without filter if allowed.
+    // Supabase delete usually requires a WHERE clause for safety.
+    // Let's use greater than timestamp 0, or just neq null.
+    // Ideally truncate, but we might not have permissions.
+    // .neq('id', '0') works if uuid.
+    // .gt('created_at', '1970-01-01') is safer.
+    .gt("created_at", "1970-01-01")
+
+  if (error) {
+    console.error("Error deleting all vocab:", error)
+    return { success: false, message: "Failed to delete all vocabulary" }
+  }
+
+  revalidatePath("/")
+  return { success: true, message: "All vocabulary deleted successfully" }
 }
